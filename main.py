@@ -98,6 +98,14 @@ def search_auth_file(line, auth_ws):  # This is how auth_ws should be referenced
             return row_num + 1
     return "not_found"
 
+def gen_auth_lookup(auth_ws):
+    # suggest replace search_auth_file with this to just once create a dict you can use to lookup ark_ids using subject names
+    auth_lookup = {}
+    for row_num, row in enumerate(auth_ws.iter_rows()):
+        auth_name, ark_id = str(row[0].value).strip().lower(), row[18].value
+        auth_lookup[auth_name] = ark_id
+    return auth_lookup
+
 
 def auth_dets(arg, label):
     if arg == "not_allocated":
@@ -135,7 +143,9 @@ def authority_files(row, arg):  # add underscore to match convention
             # text = element_dict[arg](subject, authfilenumber(auth_row_num), auth_dets(role_type, "role"),
             #                         {"source": "IAMS"}, auth_dets(altrender_type, "altrender"), tid(row, arg))
             if arg == 50:  # TODO I think E should be an argument in authority_files as well
-                text = E.corpname(subject, authfilenumber(auth_row_num), auth_dets(role_type, "role"),  # line break for readability
+                # TODO whichever of the two ways above you choose to define `text` replace authfilenumber(auth_row_num) with a call to auth_lookup
+                # TODO you'll also need to add auth_lookup as an arg to authority_files)
+                text = E.corpname(subject, auth_lookup.get(subject, "not_found"), auth_dets(role_type, "role"),  # line break for readability
                                   {"source": "IAMS"}, auth_dets(altrender_type, "altrender"), tid(row, arg))
             elif arg == 48:
                 text = E.persname(subject, authfilenumber(auth_row_num), auth_dets(role_type, "role"),
@@ -171,8 +181,9 @@ for shelfmark_modified in shelfmarks:  # Use sm instead of shelfmark_modified fo
         print("Sheet not found")
 
     # This part defines where the authority files details are held.
-
-    auth_file_name = 'Authorities_combined.xlsx'  # TODO auth_ws only needs to be defined once, so can do before for loop
+    # TODO auth_ws only needs to be defined once, so can do before for loop (e.g. before where you define wb_input)
+    # TODO run gen_auth_lookup() on the auth_ws defined here
+    auth_file_name = 'Authorities_combined.xlsx'
     auth_file_wb = load_workbook(auth_file_name, read_only=True)
     try:
         auth_ws = auth_file_wb["1"]
@@ -227,7 +238,8 @@ for shelfmark_modified in shelfmarks:  # Use sm instead of shelfmark_modified fo
     GEOGNAME = E.geogname
     NOTE = E.note
 
-    full_ead = EAD()
+    # full_ead = EAD()
+    full_ead = E.ead()
 
     rec_num = 1  # Move rec_num/tid_num defs here to be closer to where they're used
     tid_num = 1  # TODO explain that this is updated every time tid() is called?
@@ -245,7 +257,7 @@ for shelfmark_modified in shelfmarks:  # Use sm instead of shelfmark_modified fo
         eadheader = EADHEADER(start_record(str(rec_num)))
         ead.append(eadheader)
 
-        eadid = EADID(str(shelfmark), tid(row, 5))
+        eadid = E.eadid(str(shelfmark), tid(row, 5))
         eadheader.append(eadid)
 
         filedesc = FILEDESC()  # wrapper node, should not have info
@@ -430,7 +442,7 @@ for shelfmark_modified in shelfmarks:  # Use sm instead of shelfmark_modified fo
         full_ead.append(archdesc)
 
     # This part writes out the XML file
-    with open(shelfmark_modified + '.xml', 'wb') as f:
+    with open("trail_modified" + '.xml', 'wb') as f:
         f.write(etree.tostring(full_ead, encoding='UTF-8', pretty_print=True))
 
     print(shelfmark + ' complete \n')
